@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -5,19 +6,10 @@ from groq import Groq
 from dotenv import load_dotenv
 import os
 
-# Load .env file
 load_dotenv()
 
-# Get API Key from .env
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+app = FastAPI()
 
-# Create Groq Client
-client = Groq(api_key=GROQ_API_KEY)
-
-# Create FastAPI App
-app = FastAPI(title="EduBot AI")
-
-# Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,39 +18,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Request Model
+client = Groq(
+    api_key=os.getenv("GROQ_API_KEY")
+)
+
 class ChatRequest(BaseModel):
     message: str
 
-# Home Route
 @app.get("/")
-def home():
-    return {
-        "message": "EduBot AI Groq Backend Running"
-    }
+async def home():
+    return {"message": "EduBot AI Backend Running"}
 
-# Chat Route
 @app.post("/chat")
 async def chat(request: ChatRequest):
     try:
-
         completion = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.3-70b-versatile",  
             messages=[
                 {
                     "role": "system",
-                    "content": """
-                    You are EduBot AI, a personal learning assistant.
-
-                    Help students with:
-                    - Study doubts
-                    - Programming questions
-                    - Note summarization
-                    - Learning tips
-                    - Career guidance
-
-                    Give clear and beginner-friendly answers.
-                    """
+                    "content": "You are EduBot AI, a helpful learning assistant."
                 },
                 {
                     "role": "user",
@@ -67,14 +46,18 @@ async def chat(request: ChatRequest):
             ]
         )
 
-        response = completion.choices[0].message.content
-
-        return {
-            "response": response
-        }
+        if completion and completion.choices:
+            return {
+                "response": completion.choices[0].message.content
+            }
+        else:
+            raise HTTPException(
+                status_code=502,
+                detail="Groq API returned an empty response."
+            )
 
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=str(e)
+            status_code=400,
+            detail=f"API Error: {str(e)}"
         )
